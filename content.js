@@ -50,7 +50,13 @@ function extractData() {
   // Extract origin of the question
   data.origin = getValueAfterHeading('Source of the question referred for a preliminary ruling');
   if (data.origin !== '-') {
-    data.origin = data.origin.split(' - ')[1].trim();
+    const parts = data.origin.split(' - ');
+    if (parts.length > 1) {
+      data.origin = parts[1].trim();
+    } else {
+      console.log('Origin is: ', data.origin);
+      data.origin = '*';
+    }
   }
 
   // Extract year delivered
