@@ -32,7 +32,7 @@ function extractData() {
     data.caseName = titleText[0];
     
     // Check if "Chamber" is present in the first line
-    if (data.caseName.includes('Chamber)')) {
+    if (data.caseName.includes('Chamber)') || data.caseName.includes('President of')) {
       // If so, assign the second line to caseName
       data.caseName = titleText[1];
     }
