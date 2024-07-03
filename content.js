@@ -23,9 +23,28 @@ function extractData() {
   // Extract case number and name from bold titles
   const detailsTitle = document.querySelector('.details_decision_title');
   if (detailsTitle) {
-    const titleText = detailsTitle.innerText.split('\n').map(t => t.trim());
+    // Split the innerText by newlines and trim each line
+    const titleText = detailsTitle.innerText.split('\n').map(t => t.trim()).filter(t => t);
+
+    console.log(titleText);
+    
+    // Initially assign the first line to caseName
     data.caseName = titleText[0];
-    data.caseNumber = titleText[1].replace('Case ', '');
+    
+    // Check if "Chamber" is present in the first line
+    if (data.caseName.includes('Chamber)')) {
+      // If so, assign the second line to caseName
+      data.caseName = titleText[1];
+    }
+
+    // Define the regular expression pattern
+    const pattern = /C-\d+\/\d+/;
+
+    // Try to find the pattern in the text
+    const foundPattern = titleText.join(' ').match(pattern);
+
+    // Assign the found pattern to caseNumber if it exists, otherwise assign the second line value
+    data.caseNumber = foundPattern ? foundPattern[0] : titleText[1].replace('Case ', '');
   }
 
   // Extract origin of the question
