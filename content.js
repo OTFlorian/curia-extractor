@@ -7,7 +7,7 @@ function getValueAfterHeading(headingText) {
       valueElement = valueElement.nextElementSibling;
     }
     if (valueElement && valueElement.tagName === 'P') {
-      if ( valueElement.innerText.trim() === 'Information not available') { 
+      if (valueElement.innerText.trim() === 'Information not available') {
         return '-';
       }
       return valueElement.innerText.trim();
@@ -52,7 +52,9 @@ function extractData() {
   // Extract field of law from the "Procedural Analysis Information" section
   const subjectMatterElements = document.evaluate("//h2[contains(text(), 'Procedural Analysis Information')]/following-sibling::h3[contains(text(), 'Subject-matter')]/following-sibling::ul[1]/li/span", document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
   if (subjectMatterElements.snapshotLength > 0) {
-    data.fieldOfLaw = Array.from({ length: subjectMatterElements.snapshotLength }, (v, i) => subjectMatterElements.snapshotItem(i).innerText.trim()).join('; ');
+    data.fieldOfLaw = Array.from({ length: subjectMatterElements.snapshotLength }, (v, i) => subjectMatterElements.snapshotItem(i).innerText.trim())
+                           .filter(text => text !== '') // Filter out empty or whitespace-only items
+                           .join('; ');
   } else {
     data.fieldOfLaw = '-';
   }
@@ -139,7 +141,7 @@ function extractCompositionAndOrder(data) {
             console.log(substrings);
 
             // Filter out substrings containing "juge" or "président"
-            const filteredSubstrings = substrings.filter(substring => 
+            const filteredSubstrings = substrings.filter(substring =>
               !substring.includes("juge") && !substring.includes("président")
             );
 
@@ -198,6 +200,29 @@ function extractCompositionAndOrder(data) {
   });
 }
 
+// Function to apply final transformations
+function applyFinalTransformations(data) {
+  console.log('Extracted data:', data);
+  if (data.formationRaw.includes('président') || data.formationRaw.includes('president') || data.presidentInText === '1') {
+    data.composition = '-';
+    data.orderJudgement = '4';
+    console.log('Decided by President, setting composition to - and orderJudgement to 4');
+  }
+  if (data.opinionPresent) {
+    data.opinion = '1';
+    console.log('Opinion is present in the table, setting it to 1');
+  }
+  if (data.opinionRaw !== '-' && data.opinion !== '1' && data.orderJudgement === '1') {
+    data.opinion = '1';
+  } else if (data.opinionRaw === '-' && data.opinion !== '1' && data.orderJudgement === '1') {
+    data.opinion = '0';
+  } else if (data.orderJudgement === '2; 3' || data.orderJudgement === '4' || data.orderJudgement === '2' || data.orderJudgement === '3') {
+    data.opinion = '-';
+    console.log('OrderJudgement is 2, 3, 4 or combination, so setting Opinion to -.');
+  }
+  return data;
+}
+
 // Function to download the CSV
 function downloadCSV(data) {
   const csvData = [
@@ -222,8 +247,8 @@ function downloadCSV(data) {
   };
 
   // Create CSV content
-  const csvContent = "data:text/csv;charset=utf-8," 
-      + csvData.map(row => row.map(escapeValue).join(",")).join("\n");
+  const csvContent = "data:text/csv;charset=utf-8,"
+    + csvData.map(row => row.map(escapeValue).join(",")).join("\n");
 
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
@@ -235,35 +260,107 @@ function downloadCSV(data) {
   document.body.removeChild(link);
 }
 
-// Event listener for the Extract button
+// Function to get all case information links on the search query page
+function getAllCaseLinks() {
+  const links = [];
+  document.querySelectorAll('#listeAffaires .decision_links a').forEach(link => {
+    links.push(link.href);
+  });
+  return links;
+}
+
+// Function to handle multiple case extraction and aggregate data
+async function extractAllCases() {
+  const originalUrl = window.location.href; // Store the original URL
+  const caseLinks = getAllCaseLinks();
+  const failedCases = []; // To track failed cases
+  const aggregatedData = [
+    ['Case Number', 'Case Name', 'Origin of the Q', 'Year Delivered', 'Type of Proceedings', 'Field of Law', 'Reporting Judge Name', 'Composition', 'Order/Judgement', 'AG', 'Opinion', 'Comments', 'Link to the Case Information']
+  ]; // Header row for CSV
+
+  // Extract page number from the URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const pageNumber = urlParams.get('page') || 'unknown';
+
+  for (const link of caseLinks) {
+    // Fetch the case page and extract data without navigating away
+    await fetch(link)
+      .then(response => response.text())
+      .then(text => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, 'text/html');
+        document.body.innerHTML = doc.body.innerHTML; // Update current document with fetched content
+        return extractData();
+      })
+      .then(data => {
+        data = applyFinalTransformations(data);
+        const csvRow = [
+          data.caseNumber, data.caseName, data.origin, data.yearDelivered,
+          data.typeOfProceedings, data.fieldOfLaw, data.reportingJudge,
+          data.composition, data.orderJudgement, data.ag, data.opinion,
+          '', data.link
+        ];
+        aggregatedData.push(csvRow);
+      })
+      .catch(error => {
+        console.error('Error extracting data from', link, ':', error);
+        failedCases.push(link); // Track failed case link
+      });
+  }
+
+  // After processing all cases, navigate back to the original search query page
+  window.location.href = originalUrl;
+
+  // Create CSV content
+  const csvContent = "data:text/csv;charset=utf-8," + aggregatedData.map(row => row.map(escapeValue).join(",")).join("\n");
+
+  // Download the aggregated CSV
+  const encodedUri = encodeURI(csvContent);
+  const linkElement = document.createElement("a");
+  linkElement.setAttribute("href", encodedUri);
+  const filename = `curia_all_cases_info_page_${pageNumber}.csv`; // Include page number in the filename
+  linkElement.setAttribute("download", filename);
+  document.body.appendChild(linkElement); // Required for FF
+  linkElement.click();
+  document.body.removeChild(linkElement);
+
+  // Notify user about the extraction status
+  if (failedCases.length > 0) {
+    alert(`Extraction completed with some errors. Failed to extract the following cases:\n${failedCases.join('\n')}`);
+  } else {
+    alert('All extractions completed successfully.');
+  }
+}
+
+// Function to escape values for CSV
+function escapeValue(value) {
+  if (typeof value === 'string') {
+    // Escape double quotes by doubling them
+    value = value.replace(/"/g, '""');
+    // Wrap the value in double quotes
+    return `"${value}"`;
+  }
+  return `"${value}"`;
+}
+
+// Updated message listener to handle 'extractAllData' action
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extractData') {
     console.log('Received extractData message');
     extractData().then(data => {
-      console.log('Extracted data:', data);
-      if (data.formationRaw.includes('président') || data.formationRaw.includes('president') || data.presidentInText === '1') {
-        data.composition = '-';
-        data.orderJudgement = '4';
-        console.log('Decided by President, setting composition to 1 and orderJudgement to removal');
-      }
-      if (data.opinionPresent) {
-        data.opinion = '1';
-        console.log('Opinion is present in the table, setting it to 1');
-      }
-      if (data.opinionRaw !== '-' && data.opinion !== '1' && data.orderJudgement === '1') {
-        data.opinion = '1';
-      } else if (data.opinionRaw === '-' && data.opinion !== '1' && data.orderJudgement === '1') {
-        data.opinion = '0';
-      } else if (data.orderJudgement === '2; 3' || data.orderJudgement === '4' || data.orderJudgement === '2' || data.orderJudgement === '3') {
-        data.opinion = '-';
-        console.log('OrderJudgement is 2, 3, 4 or combination, so setting Opinion to -.');
-      }
-      console.log('Extracted data:', data);
+      data = applyFinalTransformations(data);
       downloadCSV(data);
-      sendResponse({status: 'Extraction complete'});
+      sendResponse({ status: 'Extraction complete' });
     }).catch(error => {
       console.error('Error extracting data:', error);
-      sendResponse({status: 'Extraction failed', error: error.message});
+      sendResponse({ status: 'Extraction failed', error: error.message });
+    });
+    return true; // Indicates that the response is sent asynchronously
+  } else if (request.action === 'extractAllData') {
+    extractAllCases().then(() => {
+      sendResponse({ status: 'All extractions complete' });
+    }).catch(error => {
+      sendResponse({ status: 'Extraction failed', error: error.message });
     });
     return true; // Indicates that the response is sent asynchronously
   }
