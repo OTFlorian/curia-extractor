@@ -38,7 +38,7 @@ function extractData() {
     }
 
     // Define the regular expression pattern
-    const pattern = /C-\d+\/\d+/;
+    const pattern = /C[-‑]\d+\/\d+/;
 
     // Try to find the pattern in the text
     const foundPattern = titleText.join(' ').match(pattern);
