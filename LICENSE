@@ -7,7 +7,8 @@ This software is licensed to the public under the following terms:
 ### Permissions
 
 1. **Non-Commercial Use**:
-   - You are free to use this software for non-commercial purposes.
+   - You are free to use this software for non-commercial (including academic) purposes.
+   - The condition to use this software is to appropriately mention the author (Oldřich Tristan Florian) and the software.
 
 ### Restrictions
 
@@ -15,8 +16,9 @@ This software is licensed to the public under the following terms:
    - Commercial use of this software is prohibited unless a separate commercial license is obtained from the author. To discuss commercial licensing terms, please contact the author.
 
 3. **Modification**:
-   - Modification of this software is prohibited unless a modification license is obtained from the author. If you wish to modify the software, please contact the author for licensing terms.
-   - If the author ceases maintaining the software, explicit permission must be obtained from the author to allow someone else to take over the development or make modifications. The author reserves the right to approve or deny such requests.
+   - Modification of this software is allowed for non-commercial purposes; it is however not allowed to distribute such modifications.
+   - If you wish to modify the software for commercial purposes or distribute your modifications, please contact the author for licensing terms.
+   - If the author ceases maintaining the software, explicit permission must be obtained from the author to allow someone else to distribute modifications. The author reserves the right to approve or deny such requests.
 
 4. **Distribution**:
    - Distribution of this software is prohibited unless it is done by the author. You are not allowed to share, redistribute, or otherwise distribute copies of this software. The author retains the exclusive right to distribute the software.
